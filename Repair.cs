@@ -8,11 +8,13 @@ Original work done by Kayla D'orden
 
 using System;
 using System.Linq;
+using System.Reflection;
 using System.Threading;
 using System.Windows.Media;
 using ff14bot;
 using ff14bot.AClasses;
 using ff14bot.Behavior;
+using ff14bot.Enums;
 using ff14bot.Helpers;
 using ff14bot.Managers;
 using ff14bot.RemoteWindows;
@@ -26,7 +28,9 @@ namespace AutoRepair
     {
         public static int RepairThreshold = 30;
         public static int AgentId = 36;
-
+        private static Language lang;
+        
+        
         private static ActionRunCoroutine s_hook;
 
         private Composite _root;
@@ -121,6 +125,16 @@ namespace AutoRepair
             TreeRoot.OnStart += OnBotStart;
             TreeRoot.OnStop += OnBotStop;
             Repairing = false;
+            lang = (Language) typeof(DataManager).GetFields(BindingFlags.Static | BindingFlags.NonPublic).First(i => i.FieldType == typeof(Language)).GetValue(null);
+            if (lang == Language.Chn)
+            {
+                AgentId = 33;
+                Log($"Switching to CN AgentId {AgentId}");
+            }
+            else
+            {
+                Log($"Keeping English AgentId {AgentId}");
+            }
             _root = new Decorator(r => Repairing, RepairBehavior);
             //_root = new Decorator(r => Repairing, new ActionAlwaysSucceed());
         }
