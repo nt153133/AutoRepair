@@ -9,6 +9,8 @@ Original work done by Kayla D'orden
 using System;
 using System.Linq;
 using System.Windows.Media;
+using System.Threading.Tasks;
+using Buddy.Coroutines;
 using ff14bot;
 using ff14bot.AClasses;
 using ff14bot.Behavior;
@@ -23,7 +25,7 @@ namespace AutoRepair
 {
     public class AutoRepair : BotPlugin
     {
-        public static int RepairThreshold = 30;
+        public static int RepairThreshold = 80;
         public static int AgentId = 36;
 
         private static IntPtr off;
@@ -70,24 +72,24 @@ namespace AutoRepair
                             new Decorator(r => SelectYesno.IsOpen,
                                 new Sequence(
                                     new Action(r => Log("At Select Yes/No")),
-                                    new Sleep(500),
-                                    //new Action(r => Thread.Sleep(1000)),
                                     new Action(r => SelectYesno.ClickYes()),
                                     new Action(r => Repairing = false),
-                                    new Action(r => Repair.Close())
+                                    new Action(r => Repair.Close()),
+									new Sleep(1000)
                                 )
                             ),
                             new Decorator(r => Repair.IsOpen,
                                 new Sequence(
                                     new Action(r => Log("Window open so repairing")),
-                                    new Sleep(500),
-                                    new Action(r => Repair.RepairAll())
+                                    new Action(r => Repair.RepairAll()),
+									new WaitContinue(TimeSpan.FromMilliseconds(1500.0), r => SelectYesno.IsOpen, new Action(r => RunStatus.Success))
                                 )
                             ),
                             new Decorator(r => !Repair.IsOpen,
                                 new Sequence(
                                     new Action(r => Log("Window not open so opening")),
-                                    new Action(r => OpenRepair())
+                                    new Action(r => OpenRepair()),
+                                    new WaitContinue(TimeSpan.FromMilliseconds(1500.0), r => Repair.IsOpen, new Action(r => RunStatus.Success))
                                 )
                             )
                         )
@@ -105,9 +107,9 @@ namespace AutoRepair
             TreeRoot.OnStop += OnBotStop;
             Repairing = false;
             var patternFinder = new PatternFinder(Core.Memory);
-            var off = patternFinder.Find("4C 8D 0D ? ? ? ? 45 33 C0 33 D2 48 8B C8 E8 ? ? ? ? Add 3 TraceRelative");
-            var func = patternFinder.Find("48 89 5C 24 ? 57 48 83 EC ? 88 51 ? 49 8B F9");
-            var vtable = patternFinder.Find("48 8D 05 ? ? ? ? 48 89 03 B9 ? ? ? ? 4C 89 43 ? Add 3 TraceRelative");
+            off = patternFinder.Find("4C 8D 0D ? ? ? ? 45 33 C0 33 D2 48 8B C8 E8 ? ? ? ? Add 3 TraceRelative");
+            func = patternFinder.Find("48 89 5C 24 ? 57 48 83 EC ? 88 51 ? 49 8B F9");
+            vtable = patternFinder.Find("48 8D 05 ? ? ? ? 48 89 03 B9 ? ? ? ? 4C 89 43 ? Add 3 TraceRelative");
 
             var repairAgent = AgentModule.FindAgentIdByVtable(vtable);
 
@@ -176,7 +178,17 @@ namespace AutoRepair
 
         public static void OpenRepair()
         {
-            Core.Memory.CallInjected64<IntPtr>(func, AgentModule.GetAgentInterfaceById(AgentId).Pointer, 0, 0, off);
+			Log($"OPEN: AgentId {AgentId} Offset {off.ToInt64():X} Func {func.ToInt64():X}");
+			lock (Core.Memory.Executor.AssemblyLock)
+			{
+				Core.Memory.CallInjected64<IntPtr>(func, new object[4]
+				{
+					ff14bot.Managers.AgentModule.GetAgentInterfaceById(AgentId).Pointer,
+					0,
+					0,
+					off	
+				});
+			}
         }
 
         public static void Log(string text)
