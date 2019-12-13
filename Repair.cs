@@ -25,7 +25,7 @@ namespace AutoRepair
 {
     public class AutoRepair : BotPlugin
     {
-        public static int RepairThreshold = 80;
+        public static int RepairThreshold = 50;
         public static int AgentId = 36;
 
         private static IntPtr off;
